@@ -6,7 +6,9 @@
 #include <unistd.h>    
 
 
+
 unsigned int MAX_CON = 5;
+unsigned int REQUEST_BUFFER_SIZE = 32;
 
 int serverSock;                   
 int clientSock;            
@@ -21,6 +23,8 @@ void closeSocket (int socket);
 void fillServerAddr ();
 void bindNetwork ();
 void setListen ();
+void listenRequest();
+void HandleClient();
 
 int main (int argc, char** argv) {
 
@@ -31,6 +35,8 @@ int main (int argc, char** argv) {
     bindNetwork();
 
     setListen();
+
+    listenRequest();
 
     closeSocket(serverSock);
 }
@@ -73,9 +79,63 @@ void bindNetwork () {
 void setListen () {
     int listenResult = listen(serverSock, MAX_CON);
     
-    if (listenResult >= 0) printf("socket listening!\n");
+    if (listenResult >= 0) printf("socket set to listen!\n");
     else {
         perror("socket failed to listen");
         exit(EXIT_FAILURE);
     }      
 } 
+
+void listenRequest() {
+
+     while(1) {
+        clientAddrLen = sizeof(clientAddr);
+
+        printf("\t\tWaiting for a request yo\n");
+        /* Wait for a client to connect */
+        clientSock = accept(serverSock, (struct sockaddr *) &clientAddr, &clientAddrLen);  
+    
+        if (clientSock >= 0) printf("request accepted!\n");
+        else {
+            perror("socket accept failed");
+            exit(EXIT_FAILURE);
+        }      
+
+        /* clntSock is connected to a client! */
+
+        printf("Handling client %s\n", inet_ntoa(clientAddr.sin_addr));
+
+        HandleClient();
+    }
+}
+
+void HandleClient() {
+    char requestBuffer[REQUEST_BUFFER_SIZE];       
+    int requestMsgSize;                  
+
+    /* Receive message from client */
+    requestMsgSize = recv(clientSock, requestBuffer, REQUEST_BUFFER_SIZE, 0);
+    if (requestMsgSize >=0) printf("msg found!\n");
+    else {
+        perror("no msg found");
+        exit(EXIT_FAILURE);
+    }      
+
+    while (requestMsgSize > 0) {
+
+        /* Send message back to client */
+        if (send(clientSock, requestBuffer, requestMsgSize, 0) != requestMsgSize) {
+            perror("msg failed to send");
+            exit(EXIT_FAILURE);
+        }
+            
+        /* Check for more data to receive */
+        if ((requestMsgSize = recv(clientSock, requestBuffer, requestMsgSize, 0)) < 0) {
+            perror("msg failed to send");
+            exit(EXIT_FAILURE);
+        }
+    }
+
+    /* Close client socket */
+    close(clientSock);    
+}
