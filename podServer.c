@@ -5,8 +5,6 @@
 #include <string.h>    
 #include <unistd.h>    
 
-
-
 unsigned int MAX_CON = 5;
 unsigned int REQUEST_BUFFER_SIZE = 32;
 
