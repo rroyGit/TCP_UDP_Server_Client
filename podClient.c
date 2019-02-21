@@ -14,21 +14,20 @@ int main(int argc, char *argv[])
     struct sockaddr_in serverAddr; 
     unsigned short serverPort; 
     char *serverPhyIP;                   
-    char *requestString;                
+    char requestString[REQUEST_BUFFER_SIZE];
+    char requestStringBuffer[REQUEST_BUFFER_SIZE];
     char requestBuffer[REQUEST_BUFFER_SIZE];     
     unsigned int requestStringLen;      
     int bytesReceived, totalBytesReceived;
 
-    if (argc != 4) {
-       fprintf(stderr, "Usage: %s <Server IP> <A Word> <Echo Port>\n", argv[0]);
+    if (argc != 3) {
+       fprintf(stderr, "Usage: %s <Server IP> <Server Port>\n", argv[0]);
        exit(1);
     }
 
     serverPhyIP = argv[1];
-    requestString = argv[2];
-    serverPort = atoi(argv[3]);
+    serverPort = atoi(argv[2]);
     
-
     /* Create a reliable, stream socket using TCP */
     if ((clientSock = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0) {
         perror("socket was not created");
@@ -47,31 +46,45 @@ int main(int argc, char *argv[])
         exit(EXIT_FAILURE);
     }
 
-    requestStringLen = strlen(requestString);
+    
+    for (unsigned short i = 0; i < 5; i++) {
 
-    /* Send the string to the server */
-    if (send(clientSock, requestString, requestStringLen, 0) != requestStringLen) {
-        perror("socket sent incorrect bytes");
-        exit(EXIT_FAILURE);
-    }
+        printf("Enter %u chars text:", REQUEST_BUFFER_SIZE-1);
 
-    /* Receive the same string back from the server */
-    totalBytesReceived = 0;
-    printf("Received: ");
+        fgets(requestStringBuffer, REQUEST_BUFFER_SIZE, stdin);
+        char* pch = strchr(requestStringBuffer, '\n');
+        if (pch != NULL) *pch = '\0';
 
-    while (totalBytesReceived < requestStringLen) {
-        /* Receive up to the buffer size (minus 1 to leave space for a null terminator) bytes from the sender */
-        if ((bytesReceived = recv(clientSock, requestBuffer, REQUEST_BUFFER_SIZE - 1, 0)) <= 0) {
-            perror("recv() failed or connection closed prematurely");
+        memcpy(&requestString, &requestStringBuffer, (unsigned)(strlen(requestStringBuffer)+1));
+        requestStringLen = strlen(requestString);
+
+        printf("Sending: |%s|\n", requestString);
+
+
+        /* Send the string to the server */
+        if (send(clientSock, requestStringBuffer, requestStringLen, 0) != requestStringLen) {
+            perror("socket sent incorrect bytes");
             exit(EXIT_FAILURE);
         }
-    
-        totalBytesReceived += bytesReceived;
-        requestBuffer[bytesReceived] = '\0';  /* Terminate the string! */
-        printf("%s", requestBuffer);
-    }
 
-    printf("\n");    /* Print a final linefeed */
+        /* Receive the same string back from the server */
+        totalBytesReceived = 0;
+        printf("Received: ");
+
+        while (totalBytesReceived < requestStringLen) {
+            /* Receive up to the buffer size (minus 1 to leave space for a null terminator) bytes from the sender */
+            if ((bytesReceived = recv(clientSock, requestBuffer, REQUEST_BUFFER_SIZE - 1, 0)) <= 0) {
+                perror("recv() failed or connection closed prematurely");
+                exit(EXIT_FAILURE);
+            }
+        
+            totalBytesReceived += bytesReceived;
+            requestBuffer[bytesReceived] = '\0';  /* Terminate the string! */
+            printf("%s", requestBuffer);
+        }
+
+        printf("\n");    /* Print a final linefeed */
+    }
 
     close(clientSock);
     exit(0);

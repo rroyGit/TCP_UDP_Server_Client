@@ -26,6 +26,11 @@ void HandleClient();
 
 int main (int argc, char** argv) {
 
+    if (argc != 2) {
+       fprintf(stderr, "Usage: %s <Port>\n", argv[0]);
+       exit(1);
+    }
+
     setSocket(argv);
 
     fillServerAddr();
@@ -113,11 +118,14 @@ void HandleClient() {
 
     /* Receive message from client */
     requestMsgSize = recv(clientSock, requestBuffer, REQUEST_BUFFER_SIZE, 0);
-    if (requestMsgSize >=0) printf("msg found!\n");
+    if (requestMsgSize > 0) printf("Msg found - size: %i\n", requestMsgSize);
     else {
         perror("no msg found");
         exit(EXIT_FAILURE);
     }      
+
+    strcat(requestBuffer, " yo");
+    requestMsgSize += 3;
 
     while (requestMsgSize > 0) {
 
@@ -126,12 +134,19 @@ void HandleClient() {
             perror("msg failed to send");
             exit(EXIT_FAILURE);
         }
-            
+        
+        memset(requestBuffer, 0, REQUEST_BUFFER_SIZE);
+
         /* Check for more data to receive */
-        if ((requestMsgSize = recv(clientSock, requestBuffer, requestMsgSize, 0)) < 0) {
-            perror("msg failed to send");
+        if ((requestMsgSize = recv(clientSock, requestBuffer, REQUEST_BUFFER_SIZE, 0)) <= 0) {
+            perror("failed to receive msg or no msg meant be received");
             exit(EXIT_FAILURE);
         }
+
+        printf("Extra Msg found - size: %i\n", requestMsgSize);
+
+        strcat(requestBuffer, " yo");
+        requestMsgSize += 3;
     }
 
     /* Close client socket */
