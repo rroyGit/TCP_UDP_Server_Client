@@ -1,23 +1,23 @@
-#include <stdio.h>      
+#include <stdio.h>
 #include <sys/socket.h> /* socket(), connect(), send(), recv() */
 #include <arpa/inet.h>  /* sockaddr_in and inet_addr() */
-#include <stdlib.h>     
-#include <string.h>     
-#include <unistd.h>    
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
 
 #define REQUEST_BUFFER_SIZE 32   /* Size of receive buffer */
 
 
 int main(int argc, char *argv[])
 {
-    int clientSock;                     
-    struct sockaddr_in serverAddr; 
-    unsigned short serverPort; 
-    char *serverPhyIP;                   
+    int clientSock;
+    struct sockaddr_in serverAddr;
+    unsigned short serverPort;
+    char *serverPhyIP;
     char requestString[REQUEST_BUFFER_SIZE];
     char requestStringBuffer[REQUEST_BUFFER_SIZE];
-    char requestBuffer[REQUEST_BUFFER_SIZE];     
-    unsigned int requestStringLen;      
+    char requestBuffer[REQUEST_BUFFER_SIZE];
+    unsigned int requestStringLen;
     int bytesReceived, totalBytesReceived;
 
     if (argc != 3) {
@@ -27,26 +27,27 @@ int main(int argc, char *argv[])
 
     serverPhyIP = argv[1];
     serverPort = atoi(argv[2]);
-    
+
     /* Create a reliable, stream socket using TCP */
     if ((clientSock = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0) {
         perror("socket was not created");
         exit(EXIT_FAILURE);
-    }
+    } else printf("socket created\n");
 
     /* Construct the server address structure */
-    memset(&serverAddr, 0, sizeof(serverAddr));    
-    serverAddr.sin_family = AF_INET;             
-    serverAddr.sin_addr.s_addr = inet_addr(serverPhyIP);   
+    memset(&serverAddr, 0, sizeof(serverAddr));
+    serverAddr.sin_family = AF_INET;
+    serverAddr.sin_addr.s_addr = inet_addr(serverPhyIP);
     serverAddr.sin_port = htons(serverPort);
 
+    printf("socket connecting...\n");
     /* Establish the connection to the server */
     if (connect(clientSock, (struct sockaddr *) &serverAddr, sizeof(serverAddr)) < 0) {
         perror("socket was not connected");
         exit(EXIT_FAILURE);
-    }
+    } else printf("socket connected\n");
 
-    
+
     for (unsigned short i = 0; i < 5; i++) {
 
         printf("Enter %u chars text:", REQUEST_BUFFER_SIZE-1);
@@ -77,7 +78,7 @@ int main(int argc, char *argv[])
                 perror("recv() failed or connection closed prematurely");
                 exit(EXIT_FAILURE);
             }
-        
+
             totalBytesReceived += bytesReceived;
             requestBuffer[bytesReceived] = '\0';  /* Terminate the string! */
             printf("%s", requestBuffer);
