@@ -37,7 +37,13 @@ int main(int argc, char *argv[])
     /* Construct the server address structure */
     memset(&serverAddr, 0, sizeof(serverAddr));
     serverAddr.sin_family = AF_INET;
-    serverAddr.sin_addr.s_addr = inet_addr(serverPhyIP);
+    if (inet_addr(serverPhyIP) == -1) {
+        perror("IP could not be converetd to network bytes");
+        exit(EXIT_FAILURE);
+    } else {
+        serverAddr.sin_addr.s_addr = inet_addr(serverPhyIP);
+    }
+    
     serverAddr.sin_port = htons(serverPort);
 
     printf("socket connecting...\n");
