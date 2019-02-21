@@ -118,14 +118,16 @@ void HandleClient() {
 
     /* Receive message from client */
     requestMsgSize = recv(clientSock, requestBuffer, REQUEST_BUFFER_SIZE, 0);
-    if (requestMsgSize > 0) printf("Msg found - size: %i\n", requestMsgSize);
-    else {
+
+    if (requestMsgSize > 0) {
+        printf("Msg found - size: %i\n", requestMsgSize);
+        requestBuffer[requestMsgSize] = '\0';
+        strcat(requestBuffer," yo");
+        requestMsgSize = strlen(requestBuffer);
+    } else {
         perror("no msg found");
         exit(EXIT_FAILURE);
     }      
-
-    strcat(requestBuffer, " yo");
-    requestMsgSize += 3;
 
     while (requestMsgSize > 0) {
 
@@ -135,6 +137,7 @@ void HandleClient() {
             exit(EXIT_FAILURE);
         }
         
+        // clear dank memory
         memset(requestBuffer, 0, REQUEST_BUFFER_SIZE);
 
         /* Check for more data to receive */
@@ -145,8 +148,9 @@ void HandleClient() {
 
         printf("Extra Msg found - size: %i\n", requestMsgSize);
 
-        strcat(requestBuffer, " yo");
-        requestMsgSize += 3;
+        requestBuffer[requestMsgSize] = '\0';
+        strcat(requestBuffer," yo");
+        requestMsgSize = strlen(requestBuffer);
     }
 
     /* Close client socket */
