@@ -90,7 +90,7 @@ int main(int argc, char *argv[])
             printf("%s", requestBuffer);
         }
 
-        printf("\n");    /* Print a final linefeed */
+        printf("\n"); 
     }
 
     close(clientSock);

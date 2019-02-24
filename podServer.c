@@ -141,18 +141,21 @@ void HandleClient() {
         memset(requestBuffer, 0, REQUEST_BUFFER_SIZE);
 
         /* Check for more data to receive */
-        if ((requestMsgSize = recv(clientSock, requestBuffer, REQUEST_BUFFER_SIZE, 0)) <= 0) {
-            perror("failed to receive msg or no msg meant be received");
+
+        requestMsgSize = recv(clientSock, requestBuffer, REQUEST_BUFFER_SIZE, 0);
+
+        if (requestMsgSize == -1) {
+            perror("failed to receive msg");
             exit(EXIT_FAILURE);
+        } else if (requestMsgSize == 0) {
+            printf("No msg meant be received - client disconnected");
+        } else {
+            printf("Extra Msg found - size: %i\n", requestMsgSize);
+            requestBuffer[requestMsgSize] = '\0';
+            strcat(requestBuffer," yo");
+            requestMsgSize = strlen(requestBuffer);
         }
-
-        printf("Extra Msg found - size: %i\n", requestMsgSize);
-
-        requestBuffer[requestMsgSize] = '\0';
-        strcat(requestBuffer," yo");
-        requestMsgSize = strlen(requestBuffer);
     }
 
-    /* Close client socket */
     close(clientSock);    
 }
