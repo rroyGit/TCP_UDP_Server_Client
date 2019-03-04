@@ -8,8 +8,7 @@
 #define REQUEST_BUFFER_SIZE 32   /* Size of receive buffer */
 
 
-int main(int argc, char *argv[])
-{
+int main(int argc, char *argv[]) {
     int clientSock;
     struct sockaddr_in serverAddr;
     unsigned short serverPort;
@@ -28,17 +27,12 @@ int main(int argc, char *argv[])
     serverPhyIP = argv[1];
     serverPort = atoi(argv[2]);
 
-    /* Create a reliable, stream socket using TCP */
-    if ((clientSock = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0) {
-        perror("socket was not created");
-        exit(EXIT_FAILURE);
-    } else printf("socket created\n");
-
     /* Construct the server address structure */
     memset(&serverAddr, 0, sizeof(serverAddr));
     serverAddr.sin_family = AF_INET;
     if (inet_addr(serverPhyIP) == -1) {
         perror("IP could not be converetd to network bytes");
+        close(clientSock);
         exit(EXIT_FAILURE);
     } else {
         serverAddr.sin_addr.s_addr = inet_addr(serverPhyIP);
@@ -46,15 +40,19 @@ int main(int argc, char *argv[])
     
     serverAddr.sin_port = htons(serverPort);
 
-    printf("socket connecting...\n");
-    /* Establish the connection to the server */
-    if (connect(clientSock, (struct sockaddr *) &serverAddr, sizeof(serverAddr)) < 0) {
-        perror("socket was not connected");
-        exit(EXIT_FAILURE);
-    } else printf("socket connected\n");
+    for (unsigned short i = 0; i < 3; i++) {
 
+        /* Create a reliable, stream socket using TCP */
+        if ((clientSock = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0) {
+            perror("socket was not created");
+            exit(EXIT_FAILURE);
+        }
 
-    for (unsigned short i = 0; i < 5; i++) {
+        /* Establish the connection to the server */
+        if (connect(clientSock, (struct sockaddr *) &serverAddr, sizeof(serverAddr)) < 0) {
+            perror("socket was not connected");
+            exit(EXIT_FAILURE);
+        } else printf("socket connected\n");
 
         printf("Enter %u chars text:", REQUEST_BUFFER_SIZE-1);
 
@@ -64,9 +62,8 @@ int main(int argc, char *argv[])
 
         memcpy(&requestString, &requestStringBuffer, (unsigned)(strlen(requestStringBuffer)+1));
         requestStringLen = strlen(requestString);
-
+    //----------------------------------------------------------------------------------------------------//
         printf("Sending: |%s|\n", requestString);
-
 
         /* Send the string to the server */
         if (send(clientSock, requestStringBuffer, requestStringLen, 0) != requestStringLen) {
@@ -91,8 +88,8 @@ int main(int argc, char *argv[])
         }
 
         printf("\n"); 
+        close(clientSock);
     }
-
-    close(clientSock);
-    exit(0);
+   
+   return EXIT_SUCCESS;
 }

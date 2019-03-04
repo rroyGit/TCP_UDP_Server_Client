@@ -12,16 +12,18 @@
 #include <string.h>    
 #include <unistd.h>
 
-unsigned int MAX_CON = 5;
+#define MAX_CON  5
+#define MAX_FDS  6
+
 unsigned int REQUEST_BUFFER_SIZE = 32;
 
-int serverSock;                   
-int clientSock;        
+int serverSock = -1;                   
+int clientSock = -1;        
 
 int rc, serverOn = 1;
 
 struct sockaddr_in serverAddr; 
-struct sockaddr_in clientAddr; 
+struct sockaddr_in clientAddr[MAX_CON]; 
 unsigned short serverPort;  
 unsigned int clientAddrLen;        
 
@@ -31,15 +33,19 @@ void fillServerAddr ();
 void bindNetwork ();
 void setListen ();
 void listenRequest();
-void HandleClient();
+void HandleClient(int index);
 
 void setSocketResuable ();
 void setSocketNonblocking ();
 void initPollFD ();
 
-struct pollfd fds[5];
+struct pollfd fds[MAX_FDS];
 int nfds = 1, current_size = 0, i, j;
 int timeout;
+
+int close_client = 0;
+int close_server = 0;
+int shift_pollfds = 0;
 
 int main (int argc, char** argv) {
 
@@ -64,7 +70,7 @@ int main (int argc, char** argv) {
 
     listenRequest();
 
-    closeSocket(serverSock);
+    return EXIT_SUCCESS;
 }
 
 void setSocket (char** argv) {
@@ -143,90 +149,127 @@ void setListen () {
 
 void listenRequest() {
 
-     while(1) {
+    do {
         printf("\t\tWaiting on polling!\n");
         rc = poll(fds, nfds, timeout);
 
         if (rc < 0){
             perror("polling failed");
-            closeSocket(serverSock);
-            exit(EXIT_FAILURE);
+            break;
         }
     
         if (rc == 0) {
-            printf("Polling timed out");
-            closeSocket(serverSock);
-            exit(EXIT_FAILURE);
+            printf("Polling timed out\n");
+            break;
         }
 
-
-        clientAddrLen = sizeof(clientAddr);
-
+        current_size = nfds;
         
-        /* Wait for a client to connect */
-        clientSock = accept(serverSock, (struct sockaddr *) &clientAddr, &clientAddrLen);  
+        for (i = 0; i < current_size; i++) {
+
+            if (fds[i].revents == 0) continue;
+
+
+            if (fds[i].revents != POLLIN) {
+                perror("No pollin");
+                close_server = 1;
+                break;
+            }
+
+            if (fds[i].fd == serverSock) {
+                do {
+                    // need a list of clientAddr
+                    clientAddrLen = sizeof(clientAddr);
+
+                    /* Wait for a client to connect */
+                    clientSock = accept(serverSock, (struct sockaddr *) &clientAddr[nfds-1], &clientAddrLen);  
+                
+                    if (clientSock < 0) {
+                        if (errno != EWOULDBLOCK) {
+                            perror("socket accept failed");
+                            close_server = 1;
+                        }
+                        break;
+                    }
+
+                    printf("  New incoming connection - %i\n", clientSock);
+                    fds[nfds].fd = clientSock;
+                    fds[nfds].events = POLLIN;
+                    nfds++;      
+                } while(clientSock != -1);
+                
+            } else {
+                printf("Handling client %s\n", inet_ntoa(clientAddr[i-1].sin_addr));
+
+                HandleClient(i);
+            }
+        }
+
+        if (shift_pollfds) {
+            shift_pollfds = 0;
+
+            for (i = 0; i < nfds; i++) {
+                if(fds[i].fd == -1) {
+                    for(j = i; j < nfds - 1; j++) {
+                        fds[j].fd = fds[j+1].fd;
+
+                        clientAddr[j] = clientAddr[j+1];
+
+                    }
+                    fds[j].fd = -1;
+                    memset(&clientAddr[j], 0, sizeof(clientAddr[j]));
+                    i--;
+                    nfds--;
+                }
+            }
+        }
+
+    } while (close_server == 0);
+
     
-        if (clientSock >= 0) printf("request accepted!\n");
-        else {
-            perror("socket accept failed");
-            closeSocket(serverSock);
-            exit(EXIT_FAILURE);
-        }      
-
-        /* clntSock is connected to a client! */
-
-        printf("Handling client %s\n", inet_ntoa(clientAddr.sin_addr));
-
-        HandleClient();
+    for (i = 0; i < nfds; i++) {
+        if (fds[i].fd >= 0)  closeSocket(fds[i].fd);
     }
 }
 
-void HandleClient() {
+void HandleClient(int index) {
     char requestBuffer[REQUEST_BUFFER_SIZE];       
-    int requestMsgSize;                  
+    int requestMsgSize;
 
-    /* Receive message from client */
-    requestMsgSize = recv(clientSock, requestBuffer, REQUEST_BUFFER_SIZE, 0);
+    do {
+        close_client = 0;
+        // clear dank memory
+        memset(requestBuffer, 0, REQUEST_BUFFER_SIZE);
+        requestMsgSize = recv(fds[index].fd, requestBuffer, REQUEST_BUFFER_SIZE, 0);
 
-    if (requestMsgSize > 0) {
+        if (requestMsgSize < 0){
+            if (errno != EWOULDBLOCK) {
+                perror("no msg found");
+                close_client = 1;
+            }
+            break;
+        } else if (requestMsgSize == 0){
+            printf("  Connection closed\n");
+            close_client = 1;
+            break;
+        }    
+
         printf("Msg found - size: %i\n", requestMsgSize);
         requestBuffer[requestMsgSize] = '\0';
         strcat(requestBuffer," yo");
         requestMsgSize = strlen(requestBuffer);
-    } else {
-        perror("no msg found");
-        closeSocket(serverSock);
-        exit(EXIT_FAILURE);
-    }      
 
-    while (requestMsgSize > 0) {
-
-        /* Send message back to client */
-        if (send(clientSock, requestBuffer, requestMsgSize, 0) != requestMsgSize) {
+        if (send(fds[index].fd, requestBuffer, requestMsgSize, 0) < 0) {
             perror("msg failed to send");
-            exit(EXIT_FAILURE);
+            close_client = 1;
+            break;
         }
-        
-        // clear dank memory
-        memset(requestBuffer, 0, REQUEST_BUFFER_SIZE);
 
-        /* Check for more data to receive */
+    } while(1);  
 
-        requestMsgSize = recv(clientSock, requestBuffer, REQUEST_BUFFER_SIZE, 0);
-
-        if (requestMsgSize == -1) {
-            perror("failed to receive msg");
-            closeSocket(serverSock);
-            exit(EXIT_FAILURE);
-        } else if (requestMsgSize == 0) {
-            printf("No msg meant be received - client disconnected");
-        } else {
-            printf("Extra Msg found - size: %i\n", requestMsgSize);
-            requestBuffer[requestMsgSize] = '\0';
-            strcat(requestBuffer," yo");
-            requestMsgSize = strlen(requestBuffer);
-        }
+    if (close_client) {
+        close(fds[index].fd);
+        fds[index].fd = -1;
+        shift_pollfds = 1;
     }
-
-    close(clientSock);    
 }
