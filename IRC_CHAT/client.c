@@ -5,7 +5,7 @@
 #include <string.h>
 #include <unistd.h>
 
-#define REQUEST_BUFFER_SIZE 32   /* Size of receive buffer */
+#define REQUEST_BUFFER_SIZE 160   /* Size of receive buffer */
 
 
 int main(int argc, char *argv[]) {
@@ -40,7 +40,7 @@ int main(int argc, char *argv[]) {
     
     serverAddr.sin_port = htons(serverPort);
 
-    for (unsigned short i = 0; i < 3; i++) {
+    for (unsigned short i = 0; i < 7; i++) {
 
         /* Create a reliable, stream socket using TCP */
         if ((clientSock = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0) {
@@ -52,9 +52,9 @@ int main(int argc, char *argv[]) {
         if (connect(clientSock, (struct sockaddr *) &serverAddr, sizeof(serverAddr)) < 0) {
             perror("socket was not connected");
             exit(EXIT_FAILURE);
-        } else printf("socket connected\n");
+        }
 
-        printf("Enter %u chars text:", REQUEST_BUFFER_SIZE-1);
+        printf("Enter %u chars text:", 31);
 
         fgets(requestStringBuffer, REQUEST_BUFFER_SIZE, stdin);
         char* pch = strchr(requestStringBuffer, '\n');
@@ -71,11 +71,11 @@ int main(int argc, char *argv[]) {
             exit(EXIT_FAILURE);
         }
 
-        /* Receive the same string back from the server */
+    
         totalBytesReceived = 0;
-        printf("Received: ");
-
-        while (totalBytesReceived < requestStringLen) {
+        
+        printf("Received:\n");
+        while (totalBytesReceived < REQUEST_BUFFER_SIZE) {
             /* Receive up to the buffer size (minus 1 to leave space for a null terminator) bytes from the sender */
             if ((bytesReceived = recv(clientSock, requestBuffer, REQUEST_BUFFER_SIZE - 1, 0)) <= 0) {
                 perror("recv() failed or connection closed prematurely");

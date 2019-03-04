@@ -47,6 +47,9 @@ int close_client = 0;
 int close_server = 0;
 int shift_pollfds = 0;
 
+char savedMessages[5][32];
+int currentIndex = 0;
+
 int main (int argc, char** argv) {
 
     if (argc != 2) {
@@ -256,10 +259,25 @@ void HandleClient(int index) {
 
         printf("Msg found - size: %i\n", requestMsgSize);
         requestBuffer[requestMsgSize] = '\0';
-        strcat(requestBuffer," yo");
+        strcat(requestBuffer," yo\n");
         requestMsgSize = strlen(requestBuffer);
 
-        if (send(fds[index].fd, requestBuffer, requestMsgSize, 0) < 0) {
+        strcpy(savedMessages[currentIndex], requestBuffer);
+
+        currentIndex++;
+        
+        char msgStack[160];
+        memset(msgStack, 0, 160);
+        for (int i = 0; i < currentIndex; i++) {
+            strcat(msgStack, savedMessages[i]);
+        }
+
+        currentIndex = (currentIndex % 5);
+
+        requestMsgSize = strlen(msgStack);
+        msgStack[requestMsgSize-1] = '\0';
+
+        if (send(fds[index].fd, msgStack, 160, 0) < 0) {
             perror("msg failed to send");
             close_client = 1;
             break;
