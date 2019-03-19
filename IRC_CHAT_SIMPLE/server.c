@@ -33,7 +33,7 @@ int serverOn = 1;
 // server address struct
 struct sockaddr_in serverAddr;
 // client(s) address struct
-struct sockaddr_in clientAddr[MAX_CON];
+struct sockaddr_in clientAddr[MAX_FDS];
 // server port number
 unsigned short serverPort;
 // length of client address for calls like accept(...)
@@ -214,14 +214,21 @@ void listenRequest() {
 
             // if it is server descriptor, then get client descriptor and store it for polling
             // else, handle client's request
-            if (fds[i].fd == serverSock) {
+
+            int socketIndex = fds[i].fd;
+
+            if (socketIndex == serverSock) {
                 do {
                     
                     clientAddrLen = sizeof(clientAddr);
 
+                    
+                    // hold temp client struct address
+                    struct sockaddr_in temp;
+
                     // get client descriptor from clients requesting to server socket
-                    clientSock = accept(serverSock, (struct sockaddr *) &clientAddr[nfds-1], &clientAddrLen);  
-                
+                    clientSock = accept(serverSock, (struct sockaddr *) &temp, &clientAddrLen);  
+                    
                     if (clientSock < 0) {
                         if (errno != EWOULDBLOCK) {
                             perror("socket accept failed");
@@ -234,12 +241,15 @@ void listenRequest() {
 
                     fds[nfds].fd = clientSock;
                     fds[nfds].events = POLLIN;
-                    nfds++;      
+                    nfds++;
+
+                    // store client address in index identified by client socket id (index)
+                    clientAddr[clientSock] = temp;
+
                 } while(clientSock != -1);
                 
             } else {
-                printf("\t\tHandling client @ %s\n", inet_ntoa(clientAddr[i-1].sin_addr));
-
+                printf("\t\tHandling client @ %s\n", inet_ntoa(clientAddr[socketIndex].sin_addr));
                 handleClient(i);
             }
         }
