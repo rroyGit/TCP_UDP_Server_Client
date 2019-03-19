@@ -1,18 +1,20 @@
 # TCP_Server
 
-Compile server.c
+### Compile server.c  
     gcc server.c -o server
 
-Compile client.c
+### Compile client.c  
     gcc client.c -o client
 
 
-Run server
+### Run server
     ./server <Port Number>
+##### Example
     ./server 3000
 
-Run client
+### Run client
     ./client <Physical IP> <Port Number>
+##### Example
     ./client 192.168.123.761 3000
 
 
@@ -23,6 +25,6 @@ The server has a timeout set to 1 minute. If a client is not connected to the se
 Received messages are displayed between two pipe characters (e.g. |my_message|); this allows easy readability and error detectability.
 
 
-Sources/Credits:
-Polling:        https://www.ibm.com/support/knowledgecenter/ssw_ibm_i_71/rzab6/poll.htm
-Socket API:     https://linux.die.net/
+### Sources/Credits:
+    Polling:        https://www.ibm.com/support/knowledgecenter/ssw_ibm_i_71/rzab6/poll.htm  
+    Socket API:     https://linux.die.net/
