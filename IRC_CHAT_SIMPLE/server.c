@@ -243,8 +243,12 @@ void listenRequest() {
                     fds[nfds].events = POLLIN;
                     nfds++;
 
+                    // prevent segfault in the event clientSock value is larger than allocated array size
+                    // client ip address MAY be invalid in such event
+                    int id = clientSock % MAX_FDS;
+
                     // store client address in index identified by client socket id (index)
-                    clientAddr[clientSock] = temp;
+                    clientAddr[id] = temp;
 
                 } while(clientSock != -1);
                 
