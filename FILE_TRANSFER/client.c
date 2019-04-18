@@ -12,8 +12,8 @@
 int processFile (char* fileName, int skipBytes, char* dataBuffer);
 
 typedef struct packet {
-    char* name;
-    char* data;
+    char name[30];
+    char data[DATA_SIZE];
 } Packet;
 
 typedef struct frameSend {
@@ -26,11 +26,14 @@ typedef struct frameReceive {
     int ack;
 } ACKFrame;
 
+
 int main(int argc, char *argv[]) {
     // client file descriptor
     int clientSock;
     // server address struct
     struct sockaddr_in serverAddr;
+    // client address struct
+    struct sockaddr_in clientAddr;
     // server port number
     unsigned short serverPort;
     // physical network IP address
@@ -51,8 +54,6 @@ int main(int argc, char *argv[]) {
     serverPhyIP = argv[1];
     serverPort = atoi(argv[2]);
     fileName = argv[3];
-
-    
 
     dataBuffer = (char*) calloc(DATA_SIZE, sizeof(char));
 
@@ -80,30 +81,50 @@ int main(int argc, char *argv[]) {
     }
 
     // get a Packet struct filled by processing the .txt file
-    int countBytes = 0;
-    int readBytes;
-    int sequenceNumber = 0;
+    int countBytes = 0, sequenceNumber = 0, readBytes, sendSize, recvSize;
+    unsigned int serverAddrLen = sizeof(serverAddr);
+    unsigned int clientAddrLen = sizeof(clientAddr);
+    unsigned int currentAck = 1;
     Packet packet;
-    Frame frame;
+    Frame sendFrame;
+    ACKFrame recvFrame;
 
     do {
-        readBytes = processFile(fileName, countBytes, dataBuffer);
-        packet.name = fileName;
-        packet.data = dataBuffer;
 
-        frame.data = packet;
-        frame.seqNum = sequenceNumber % 2;
+        if (currentAck == 1) {
+            currentAck = 0;
+            readBytes = processFile(fileName, countBytes, dataBuffer);
+            strcpy(packet.name, fileName);
+            strcpy(packet.data, dataBuffer);
+                
+            
+            memcpy(&sendFrame.data, &packet, sizeof(Packet) + 1);
+            sendFrame.seqNum = sequenceNumber % 2;
 
-        // send frame to server
-
-        printf("%s", packet.data);
-
-
-        countBytes += readBytes;
-        sequenceNumber++;
+            // send frame to server
+            sendSize = sendto(clientSock, &sendFrame, sizeof(Frame), 0, (struct sockaddr *) &serverAddr, serverAddrLen);
+        
+            if (sendSize > 0) {
+                recvSize = recvfrom(clientSock, &recvFrame, sizeof(ACKFrame), 0, (struct sockaddr *) &clientAddr, &clientAddrLen);
+                if (recvSize < 0) {
+                    printf("[Client] Receiving error\n");
+                    exit(EXIT_FAILURE);
+                }
+            } else if (sendSize < 0) {
+                printf("[Client] Sending error\n");
+                exit(EXIT_FAILURE);
+            } else {
+                printf("[Client] Sent 0 bytes\n");
+                exit(EXIT_FAILURE);
+            }
+            
+            currentAck = recvFrame.ack;
+            countBytes += readBytes;
+            sequenceNumber = 1 + recvFrame.seqNum;
+        }
     } while (readBytes == DATA_SIZE);
 
-
+    printf("All data sent! Check for new file.\n");
     // close client socket
     close(clientSock);
 
@@ -111,7 +132,7 @@ int main(int argc, char *argv[]) {
 }
 
 int processFile (char* fileName, int skipBytes, char* dataBuffer) {
-    memset(dataBuffer, '\0', DATA_SIZE);
+    memset(dataBuffer, 0, DATA_SIZE);
 
     FILE* file = fopen(fileName, "r");
     if (file == NULL) {
@@ -119,9 +140,12 @@ int processFile (char* fileName, int skipBytes, char* dataBuffer) {
         exit(EXIT_FAILURE);
     }
 
-    fseek(file, skipBytes, SEEK_SET);
+    fseek(file, skipBytes , SEEK_SET);
     int bytesRead = fread(dataBuffer, sizeof(char), DATA_SIZE, file);
 
+    //printf("%s", dataBuffer);
+
+    dataBuffer[bytesRead] = '\0';
     fclose(file);
     return bytesRead;
 }
